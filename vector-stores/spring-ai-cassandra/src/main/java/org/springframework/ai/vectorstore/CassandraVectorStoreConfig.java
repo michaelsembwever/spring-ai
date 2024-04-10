@@ -48,10 +48,11 @@ import org.slf4j.LoggerFactory;
 /**
  * Configuration for the Cassandra vector store.
  *
- * All metadata fields configured to the store will be fetched and added to all queried
+ * All metadata columns configured to the store will be fetched and added to all queried
  * documents.
  *
- * If you wish to metadata search against a field its 'searchable' argument must be true.
+ * To filter expression search against a metadata column configure it with
+ * SchemaColumnTags.INDEXED
  *
  * The Cassandra Java Driver is configured via the application.conf resource found in the
  * classpath. See
@@ -256,20 +257,27 @@ public final class CassandraVectorStoreConfig implements AutoCloseable {
 			return this;
 		}
 
-		public Builder addMetadataColumn(SchemaColumn... fields) {
+		public Builder addMetadataColumns(SchemaColumn... columns) {
 			Builder builder = this;
-			for (SchemaColumn f : fields) {
+			for (SchemaColumn f : columns) {
 				builder = builder.addMetadataColumn(f);
 			}
 			return builder;
 		}
 
-		public Builder addMetadataColumn(SchemaColumn field) {
+		public Builder addMetadataColumns(List<SchemaColumn> columns) {
+			Builder builder = this;
+			this.metadataColumns.addAll(columns);
+			return builder;
+		}
 
-			Preconditions.checkArgument(this.metadataColumns.stream().noneMatch((sc) -> sc.name().equals(field.name())),
-					"A metadata field with name %s has already been added", field.name());
+		public Builder addMetadataColumn(SchemaColumn column) {
 
-			this.metadataColumns.add(field);
+			Preconditions.checkArgument(
+					this.metadataColumns.stream().noneMatch((sc) -> sc.name().equals(column.name())),
+					"A metadata column with name %s has already been added", column.name());
+
+			this.metadataColumns.add(column);
 			return this;
 		}
 
@@ -475,7 +483,7 @@ public final class CassandraVectorStoreConfig implements AutoCloseable {
 			if (column.isPresent()) {
 
 				Preconditions.checkArgument(column.get().getType().equals(metadata.type()),
-						"Cannot change type on metadata field %s from %s to %s", metadata.name(),
+						"Cannot change type on metadata column %s from %s to %s", metadata.name(),
 						column.get().getType(), metadata.type());
 			}
 			else {

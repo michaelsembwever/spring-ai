@@ -27,6 +27,7 @@ import com.datastax.oss.driver.api.core.cql.BoundStatement;
 import com.datastax.oss.driver.api.core.cql.BoundStatementBuilder;
 import com.datastax.oss.driver.api.core.cql.PreparedStatement;
 import com.datastax.oss.driver.api.core.cql.Row;
+import com.datastax.oss.driver.api.core.cql.SimpleStatement;
 import com.datastax.oss.driver.api.core.data.CqlVector;
 import com.datastax.oss.driver.api.core.metadata.schema.TableMetadata;
 import com.datastax.oss.driver.api.querybuilder.QueryBuilder;
@@ -59,7 +60,7 @@ import org.springframework.beans.factory.InitializingBean;
  *
  * A schema matching the configuration is automatically created if it doesn't exist.
  * Missing columns and indexes in existing tables will also be automatically created.
- * Disable this with the disallowSchemaCreation.
+ * Disable this with the disallowSchemaChanges.
  *
  * This class is designed to work with brand new tables that it creates for you, or on top
  * of existing Cassandra tables. The latter is appropriate when wanting to keep data in
@@ -91,6 +92,10 @@ public final class CassandraVectorStore implements VectorStore, InitializingBean
 	public static final String SIMILARITY_FIELD_NAME = "similarity_score";
 
 	private static final Logger logger = LoggerFactory.getLogger(CassandraVectorStore.class);
+
+	private static final String DRIVER_PROFILE_UPDATES = "spring-ai-updates";
+
+	private static final String DRIVER_PROFILE_SEARCH = "spring-ai-search";
 
 	private final CassandraVectorStoreConfig conf;
 
@@ -155,7 +160,8 @@ public final class CassandraVectorStore implements VectorStore, InitializingBean
 				builder = builder.set(metadataColumn.name(), d.getMetadata().get(metadataColumn.name()),
 						metadataColumn.javaType());
 			}
-			futures[i++] = this.conf.session.executeAsync(builder.build()).toCompletableFuture();
+			BoundStatement s = builder.build().setExecutionProfileName(DRIVER_PROFILE_UPDATES);
+			futures[i++] = this.conf.session.executeAsync(s).toCompletableFuture();
 		}
 		CompletableFuture.allOf(futures).join();
 	}
@@ -189,9 +195,10 @@ public final class CassandraVectorStore implements VectorStore, InitializingBean
 
 		String query = String.format(this.similarityStmt, cqlVector, whereClause, cqlVector, request.getTopK());
 		List<Document> documents = new ArrayList<>();
-		logger.trace("Executing {}", query);
+		logger.debug("Executing {}", query);
+		SimpleStatement s = SimpleStatement.newInstance(query).setExecutionProfileName(DRIVER_PROFILE_SEARCH);
 
-		for (Row row : this.conf.session.execute(query)) {
+		for (Row row : this.conf.session.execute(s)) {
 			float score = row.getFloat(0);
 			if (score < request.getSimilarityThreshold()) {
 				break;

@@ -492,7 +492,7 @@ class CassandraRichSchemaVectorStoreIT {
 			.withEmbeddingColumnName("all_minilm_l6_v2_embedding")
 			.withIndexName("all_minilm_l6_v2_ann")
 
-			.addMetadataColumn(new SchemaColumn("revision", DataTypes.INT),
+			.addMetadataColumns(new SchemaColumn("revision", DataTypes.INT),
 					new SchemaColumn("id", DataTypes.INT, CassandraVectorStoreConfig.SchemaColumnTags.INDEXED))
 
 			// this store uses '§¶' as a deliminator in the document id between db columns
